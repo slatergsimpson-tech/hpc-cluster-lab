@@ -1,0 +1,23 @@
+# Secrets — never commit these
+*.key
+*.pem
+id_rsa*
+id_ed25519*
+munge.key
+*.secret
+secrets/
+vault-password*
+
+# Ansible
+*.retry
+
+# VM artifacts — too large / machine-specific
+*.iso
+*.ova
+*.vdi
+*.vmdk
+
+# Editor / OS noise
+.vscode/
+Thumbs.db
+.DS_Store
