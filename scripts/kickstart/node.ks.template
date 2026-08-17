@@ -1,0 +1,47 @@
+# Kickstart template for cluster nodes — Rocky 9 minimal.
+#
+# Substitute before use:
+#   @HOSTNAME@  e.g. head01.hpc.lab
+#   @IP@        e.g. 192.168.56.10
+#   @PASSWORD@  console fallback password (never commit the real one)
+#   @PUBKEY@    the cluster SSH public key
+#
+# Delivery: attach as a second DVD with volume label OEMDRV — anaconda
+# auto-discovers /ks.cfg there, no bootloader changes or kernel args needed.
+# (VirtualBox's built-in unattended mode remasters the ISO's isolinux.cfg,
+# which broke boot on Rocky 9.8 — the OEMDRV method leaves the ISO stock.)
+
+text
+cdrom
+lang en_US.UTF-8
+keyboard us
+timezone America/Chicago --utc
+
+rootpw --plaintext @PASSWORD@
+user --name=slater --groups=wheel --gecos="Slater Simpson" --password=@PASSWORD@ --plaintext
+sshkey --username=slater "@PUBKEY@"
+
+# NIC1 (enp0s3) = NAT for internet; NIC2 (enp0s8) = cluster net, static
+network --bootproto=dhcp --device=enp0s3 --onboot=on --hostname=@HOSTNAME@
+network --bootproto=static --device=enp0s8 --ip=@IP@ --netmask=255.255.255.0 --onboot=on
+
+firewall --enabled --service=ssh
+selinux --enforcing
+
+zerombr
+clearpart --all --initlabel
+bootloader --location=mbr
+part / --fstype=xfs --size=6000 --grow
+part swap --size=2048
+
+reboot --eject
+
+%packages
+@core
+%end
+
+%post --log=/root/ks-post.log
+# Ansible needs passwordless sudo to run privileged tasks non-interactively
+echo "%wheel ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/wheel-nopasswd
+chmod 440 /etc/sudoers.d/wheel-nopasswd
+%end
