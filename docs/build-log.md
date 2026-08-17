@@ -36,6 +36,13 @@ whether it recurs on the compute nodes.
 and "VM died" but not "VM hung" — a wedged bootloader looks identical to a
 slow install. Silence is not success; monitors need to cover the hang case.
 
+**Completed same day:** node01/node02 installed clean off the same template
+(~12 min each, DHCP race did not recur). /etc/hosts distributed to all three
+nodes, cluster key installed on head01, verified head01 → node01/node02 SSH
+by hostname. Milestone 1 done: three Rocky 9.8 nodes, static cluster IPs,
+name resolution, key auth everywhere. Bonus lesson: PowerShell→ssh→bash
+quoting (`\$` is not an escape in PowerShell; it reached bash as a literal).
+
 **Interview note:** this is the toy version of what Warewulf/xCAT/Foreman do
 at scale — image-based or kickstart-driven node provisioning where a node
 netboots (PXE instead of a virtual DVD), pulls its config from a provisioning
