@@ -5,6 +5,42 @@ each problem taught me. Newest entries at the top.
 
 ---
 
+## 2026-08-18 — Milestone 2: SLURM up, first jobs scheduled
+
+munge + SLURM 22.05 (EPEL) across the cluster: slurmctld on head01, slurmd
+on the compute nodes, one default `debug` partition. Verified with a 2-node
+`srun`, a 2-node batch job, and an 8-task array job that the scheduler
+load-balanced 4/4 across the nodes. Configs live in `slurm/` in this repo
+and deploy outward — repo is the source of truth.
+
+**Snags, in order:**
+
+1. *munge: "Keyfile is insecure."* munged refuses a key not owned by user
+   `munge` mode 400 — my piped key distribution left root:644. Deliberate
+   security-by-refusal, same as sshd with loose key permissions.
+2. *EPEL's slurm RPM creates no `slurm` user* — slurmctld had nothing to run
+   as. Created it manually with the same UID/GID (6001) on every node:
+   consistent UIDs cluster-wide or NFS ownership scrambles later.
+3. *Nodes stuck `unk*` in sinfo.* Firewall. `firewall-cmd --change-interface`
+   silently loses to NetworkManager on EL9 — the zone must be set with
+   `nmcli connection modify enp0s8 connection.zone trusted`. Once the cluster
+   NIC was in the trusted zone, slurmd registered and a queued srun sprang
+   to life — a free demo of queue-and-dispatch working as designed.
+4. *Job outputs "missing"* — actually scattered across compute-node local
+   homes, because there's no shared filesystem yet. Not a bug: the concrete
+   motivation for Milestone 3 (NFS /home).
+5. Process lesson repeated three times before it stuck: deep-nested quoting
+   (PowerShell → ssh → bash → ssh → bash) mangles commands in ways that look
+   like remote failures. Keep remote commands flat and single-purpose.
+
+**Interview note:** munge is the cluster's shared-secret trust fabric — every
+slurm RPC carries a munge credential; clock skew or key mismatch breaks the
+cluster in confusing ways, so it's the first thing to check when nodes go
+unknown. Production differences: slurmdbd + MySQL for accounting (we have no
+sacct yet), cgroup enforcement tuning, and topology-aware scheduling.
+
+---
+
 ## 2026-08-17 — Milestone 1: three VMs provisioned, unattended installs (with a fight)
 
 Downloaded and SHA256-verified Rocky 9.8 minimal ISO and VirtualBox 7.2.14,
