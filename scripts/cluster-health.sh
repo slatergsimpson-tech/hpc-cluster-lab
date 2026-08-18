@@ -6,7 +6,9 @@
 # sinfo, you check munge before slurm, network before munge.
 
 NODES="node01 node02"
-SSH="ssh -o BatchMode=yes -o ConnectTimeout=5 -i $HOME/.ssh/hpc-lab"
+# accept-new: a freshly reprovisioned node has a new host key — that's
+# routine, not an attack; refuse only if a KNOWN key CHANGES.
+SSH="ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new -i $HOME/.ssh/hpc-lab"
 fail=0
 
 ok()   { printf '  [ OK ] %s\n' "$1"; }

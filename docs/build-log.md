@@ -5,7 +5,38 @@ each problem taught me. Newest entries at the top.
 
 ---
 
-## 2026-08-18 (later) — NFS /home, accounting + QOS, MPI: Milestone 2 complete
+## 2026-08-18 (evening) — Milestone 4: Ansible, and the bare-metal rebuild exam
+
+Wrote `ansible/compute-node.yml`: every manual snag from milestones 1-3 as
+desired state. Proved idempotency (second run: changed=0), then the real
+exam — wiped node02 back to bare OS via kickstart and let the playbook
+rebuild it. It came back; the 2-node job that had been queued through the
+whole operation dispatched itself and COMPLETED the moment node02 rejoined.
+Also: `scripts/cluster-health.sh`, layer-ordered cluster physical.
+
+**Ansible-specific snags:** host_key_checking vs IP-addressed inventory;
+NFS root_squash blocking become (module payloads staged in the NFS home
+are unreadable by root-squashed root — remote_tmp on local disk fixes it);
+seboolean needing python3-libselinux on targets.
+
+**The big one — clock skew, and the head node was the liar.** Rebuilt
+node02 wouldn't register: slurmd log showed munge credentials ENCODED at
+06:11 and DECODED at 16:49. Ten and a half hours of skew — but chrony on
+head01 knew: "System time 38286 seconds slow of NTP" — head01 had booted
+with a broken RTC ("Time jumped backwards" was sitting in its first-boot
+console log all along) and chrony slews rather than steps errors that
+size. The FRESH node was right; the incumbent was wrong. `chronyc
+makestep` cluster-wide, all clocks agreed, node02 registered instantly.
+Lessons now encoded in the playbook: force clock sync before starting
+munge/slurmd; auto-resume down nodes after intentional reprovision. Also
+fixed the health script: a reprovisioned node has a NEW host key —
+accept-new, or your monitoring silently fails exactly when you need it.
+
+**Interview note:** this is the whole job in one afternoon: infra as code,
+an intentionally destroyed node, a scheduler that queued work through the
+outage, and a root cause (time) that hid behind three layers of symptoms
+(auth failure ← munge window ← RTC glitch from day one). "Check the clocks
+first" is HPC folk wisdom because of exactly this failure.
 
 NFS: head01 exports /home to the cluster net; nodes mount it via fstab
 (_netdev). Job outputs now land in one place — yesterday's scatter problem

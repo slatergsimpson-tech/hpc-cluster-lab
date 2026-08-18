@@ -129,6 +129,19 @@
       ansible.builtin.shell: systemctl daemon-reload && mount -a
       when: fstab.changed
 
+    - name: chronyd enabled and running
+      ansible.builtin.service:
+        name: chronyd
+        state: started
+        enabled: true
+
+    # munge is a TIME-WINDOWED credential system: a rebuilt node whose clock
+    # disagrees with the cluster gets "Invalid authentication credential"
+    # and never registers. Step the clock before starting munge/slurmd.
+    - name: Force immediate clock sync
+      ansible.builtin.command: chronyc makestep
+      changed_when: false
+
     - name: munge and slurmd enabled and running
       ansible.builtin.service:
         name: "{{ item }}"
@@ -157,6 +170,17 @@
   hosts: head
   become: false
   tasks:
+    # A node the controller marked down (e.g. it vanished mid-reprovision)
+    # stays down until an admin resumes it — that's slurm being cautious,
+    # and this task is the admin saying "I rebuilt it on purpose."
+    - name: Return down nodes to service
+      ansible.builtin.shell: |
+        for n in $(sinfo -h -t down -o "%n" | sort -u); do
+          scontrol update nodename="$n" state=resume
+        done
+      become: true
+      changed_when: false
+
     - name: Wait for all compute nodes to report idle
       ansible.builtin.command: sinfo -h -t idle -o "%D"
       register: idle_nodes
