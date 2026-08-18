@@ -5,7 +5,37 @@ each problem taught me. Newest entries at the top.
 
 ---
 
-## 2026-08-18 — Milestone 2: SLURM up, first jobs scheduled
+## 2026-08-18 (later) — NFS /home, accounting + QOS, MPI: Milestone 2 complete
+
+NFS: head01 exports /home to the cluster net; nodes mount it via fstab
+(_netdev). Job outputs now land in one place — yesterday's scatter problem
+solved. Accounting: mariadb + slurmdbd on head01, cluster registered,
+sacct records every job; QOS short (prio 100, 30m cap) and long (prio 10)
+defined; second partition `short` with higher PriorityTier. MPI: OpenMPI +
+Intel MPI Benchmarks, 2-node PingPong via sbatch.
+
+**Failure of the day #1 — locked myself out of both compute nodes.**
+Mounting NFS over /home meant sshd started reading authorized_keys from the
+NFS home — which SELinux forbids by default. Every SSH path died at once.
+Recovery: VirtualBox console (the lab's IPMI/serial-over-LAN equivalent),
+root login, `setsebool -P use_nfs_home_dirs 1`. Lesson: on EL systems,
+NFS-backed homes need that boolean *before* you cut over; and always keep
+an out-of-band access path you've actually tested. Bonus observation: SLURM
+kept scheduling jobs throughout the lockout — daemons authenticate via
+munge, not SSH.
+
+**Failure of the day #2 — MPI ranks connecting to themselves.** First
+PingPong run died with UCX "Destination is unreachable ... 10.0.2.15".
+Every VM has the *same* NAT address (10.0.2.15 — per-VM isolated NAT), and
+OpenMPI advertised it as the rank endpoint. Multi-homed nodes need MPI
+pinned to the cluster interface (UCX_NET_DEVICES=enp0s8 + oob/btl
+tcp_if_include) — the same discipline as pinning MPI to InfiniBand instead
+of the management net in production. sacct recorded the FAILED job, which
+is accounting doing exactly its job.
+
+**Numbers worth remembering:** PingPong latency ~300-500 us over virtual
+ethernet vs ~1 us on real InfiniBand — a ~400x gap. That single comparison
+is why HPC interconnects are a hardware category.
 
 munge + SLURM 22.05 (EPEL) across the cluster: slurmctld on head01, slurmd
 on the compute nodes, one default `debug` partition. Verified with a 2-node
