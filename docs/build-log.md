@@ -5,7 +5,25 @@ each problem taught me. Newest entries at the top.
 
 ---
 
-## 2026-08-19 — Milestone 5: monitoring up, and it caught a real scheduler bug
+## 2026-08-19 (later) — Milestone 6: Apptainer containers, SSH hardening, NIST mapping
+
+`ansible/hardening.yml`: Apptainer on every node plus an sshd drop-in
+(key-only auth, PermitRootLogin no, MaxAuthTries 3) — verified with
+`sshd -T` and by the fact that key-based automation kept working through
+the change. Pulled docker://alpine:3.20 into a 3.5 MB .sif on shared
+/home and ran it across both nodes under SLURM: output shows Alpine
+userland on the host's Rocky kernel on both — the container model in one
+line. No daemon, no root, image is just a file: why HPC allows Apptainer
+and bans Docker.
+
+Wrote `docs/nist-800-171-mapping.md`: lab controls mapped to six 800-171
+families, with an honest production-gap column. Best realization while
+writing it: the controls that repeatedly saved this lab were the boring
+loud ones — SELinux enforcing, checksums, munge's time window. Security
+that fails loudly is a diagnostic instrument.
+
+All six milestones now have working implementations; remaining stretch:
+BeeGFS (M3's second half) and the Lustre/GPFS comparison writeup.
 
 Deployed the whole stack as a playbook (`ansible/monitoring.yml`):
 node_exporter on all three nodes (official binaries + our systemd units —

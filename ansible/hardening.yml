@@ -1,0 +1,37 @@
+# hardening.yml — Milestone 6: containers + SSH hardening, cluster-wide.
+#
+# Run from head01:  ansible-playbook -i inventory.ini hardening.yml
+#
+# Apptainer (ex-Singularity): rootless containers for shared systems —
+# no daemon, containers run AS the user, images are plain .sif files on
+# shared storage. The reason HPC centers allow it and ban Docker.
+
+- name: Containers and SSH hardening
+  hosts: cluster
+  become: true
+  tasks:
+    - name: Apptainer
+      ansible.builtin.dnf:
+        name: apptainer
+        state: present
+
+    - name: SSH hardening drop-in
+      ansible.builtin.copy:
+        dest: /etc/ssh/sshd_config.d/50-hpclab-hardening.conf
+        owner: root
+        group: root
+        mode: "0600"
+        content: |
+          # hpclab hardening — managed by ansible (NIST 800-171 3.1/3.5)
+          PermitRootLogin no
+          PasswordAuthentication no
+          KbdInteractiveAuthentication no
+          MaxAuthTries 3
+          X11Forwarding no
+      notify: restart sshd
+
+  handlers:
+    - name: restart sshd
+      ansible.builtin.service:
+        name: sshd
+        state: restarted
