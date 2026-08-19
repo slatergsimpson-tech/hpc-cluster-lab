@@ -5,7 +5,31 @@ each problem taught me. Newest entries at the top.
 
 ---
 
-## 2026-08-18 (evening) — Milestone 4: Ansible, and the bare-metal rebuild exam
+## 2026-08-19 — Milestone 5: monitoring up, and it caught a real scheduler bug
+
+Deployed the whole stack as a playbook (`ansible/monitoring.yml`):
+node_exporter on all three nodes (official binaries + our systemd units —
+EPEL has no prometheus server for EL9), Prometheus + Grafana on head01,
+datasource and the Node Exporter Full dashboard provisioned as code,
+anonymous read-only viewing (NOC style). All four scrape targets up.
+Snag: Rocky minimal doesn't even ship `tar` — now a playbook task.
+
+**The monitoring caught a real bug on day one.** Ran the deliberate
+bottleneck (4x 1-CPU burn tasks = every core in the cluster): metrics
+showed nodes stuck at 50% CPU, load ~1, while two tasks sat PENDING
+(Resources). Half the cluster idle with work queued = scheduling bug, not
+capacity. Cause: SelectTypeParameters=CR_Core_Memory with no DefMemPerCPU
+means a job that doesn't request memory gets the node's ENTIRE memory —
+one 1-CPU task blocked the other core. One line (DefMemPerCPU=1000) and a
+resubmit: all four tasks running two-per-node, nodes at 100% CPU, memory
+flat — clean CPU-bound saturation, diagnosed from the metrics.
+
+**Interview note:** "my monitoring caught a misconfiguration the same hour
+I deployed it" is the story. The 50%-busy-with-queued-work signature is
+worth knowing cold: utilization low + queue non-empty = scheduler policy
+problem (memory defaults, wrong constraints), not load. Production stacks
+add slurm exporters (queue depth, job states) and alerting rules on
+exactly that signature.
 
 Wrote `ansible/compute-node.yml`: every manual snag from milestones 1-3 as
 desired state. Proved idempotency (second run: changed=0), then the real

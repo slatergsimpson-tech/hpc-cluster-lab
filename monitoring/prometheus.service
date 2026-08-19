@@ -1,0 +1,16 @@
+# systemd unit for the Prometheus server (head01) — deployed by ansible.
+[Unit]
+Description=Prometheus time-series database
+After=network-online.target
+
+[Service]
+User=prometheus
+Group=prometheus
+ExecStart=/usr/local/bin/prometheus \
+    --config.file=/etc/prometheus/prometheus.yml \
+    --storage.tsdb.path=/var/lib/prometheus \
+    --storage.tsdb.retention.time=15d
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

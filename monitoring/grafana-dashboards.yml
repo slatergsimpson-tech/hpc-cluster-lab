@@ -1,0 +1,10 @@
+# Grafana dashboard provider — tells Grafana to load any dashboard JSON
+# it finds in /var/lib/grafana/dashboards (populated by ansible).
+apiVersion: 1
+
+providers:
+  - name: hpclab
+    folder: ""
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards

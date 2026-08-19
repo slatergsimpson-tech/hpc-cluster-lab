@@ -1,0 +1,21 @@
+# prometheus.yml — scrape configuration for the hpclab cluster.
+# Prometheus PULLS metrics (scrapes) from each target on an interval;
+# targets just expose a /metrics HTTP endpoint and stay passive.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Prometheus watches itself — meta-monitoring, and a free sanity target.
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # One node_exporter per cluster node, addressed over the cluster network.
+  - job_name: node
+    static_configs:
+      - targets:
+          - "head01:9100"
+          - "node01:9100"
+          - "node02:9100"

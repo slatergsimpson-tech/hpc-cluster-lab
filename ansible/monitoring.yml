@@ -1,0 +1,210 @@
+# monitoring.yml — deploy the Prometheus/Grafana stack.
+#
+# Run from head01:  ansible-playbook -i inventory.ini monitoring.yml
+#
+# node_exporter on every node (official static binary — EPEL doesn't ship
+# the prometheus server for EL9, so we use upstream releases and our own
+# systemd units; that's how many real sites run it). Prometheus + Grafana
+# on head01 only. All config files come from the repo's monitoring/ dir.
+
+- name: node_exporter on every cluster node
+  hosts: cluster
+  become: true
+  vars:
+    ne_version: "1.8.2"
+    ne_url: "https://github.com/prometheus/node_exporter/releases/download/v{{ ne_version }}/node_exporter-{{ ne_version }}.linux-amd64.tar.gz"
+  tasks:
+    - name: Archive tools (minimal install ships without tar!)
+      ansible.builtin.dnf:
+        name: tar
+        state: present
+
+    - name: node_exporter system user
+      ansible.builtin.user:
+        name: node_exporter
+        system: true
+        shell: /sbin/nologin
+        create_home: false
+
+    - name: Download node_exporter release
+      ansible.builtin.get_url:
+        url: "{{ ne_url }}"
+        dest: /tmp/node_exporter.tar.gz
+        mode: "0644"
+
+    - name: Unpack
+      ansible.builtin.unarchive:
+        src: /tmp/node_exporter.tar.gz
+        dest: /tmp
+        remote_src: true
+        creates: "/tmp/node_exporter-{{ ne_version }}.linux-amd64"
+
+    - name: Install binary
+      ansible.builtin.copy:
+        src: "/tmp/node_exporter-{{ ne_version }}.linux-amd64/node_exporter"
+        dest: /usr/local/bin/node_exporter
+        remote_src: true
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: systemd unit
+      ansible.builtin.copy:
+        src: ../monitoring/node_exporter.service
+        dest: /etc/systemd/system/node_exporter.service
+        mode: "0644"
+      notify: restart node_exporter
+
+    - name: node_exporter running
+      ansible.builtin.systemd:
+        name: node_exporter
+        state: started
+        enabled: true
+        daemon_reload: true
+
+  handlers:
+    - name: restart node_exporter
+      ansible.builtin.systemd:
+        name: node_exporter
+        state: restarted
+        daemon_reload: true
+
+- name: Prometheus and Grafana on the head node
+  hosts: head
+  become: true
+  vars:
+    prom_version: "2.53.2"
+    prom_url: "https://github.com/prometheus/prometheus/releases/download/v{{ prom_version }}/prometheus-{{ prom_version }}.linux-amd64.tar.gz"
+  tasks:
+    - name: prometheus system user
+      ansible.builtin.user:
+        name: prometheus
+        system: true
+        shell: /sbin/nologin
+        create_home: false
+
+    - name: Download prometheus release
+      ansible.builtin.get_url:
+        url: "{{ prom_url }}"
+        dest: /tmp/prometheus.tar.gz
+        mode: "0644"
+
+    - name: Unpack
+      ansible.builtin.unarchive:
+        src: /tmp/prometheus.tar.gz
+        dest: /tmp
+        remote_src: true
+        creates: "/tmp/prometheus-{{ prom_version }}.linux-amd64"
+
+    - name: Install binary
+      ansible.builtin.copy:
+        src: "/tmp/prometheus-{{ prom_version }}.linux-amd64/prometheus"
+        dest: /usr/local/bin/prometheus
+        remote_src: true
+        mode: "0755"
+
+    - name: Config and data directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: prometheus
+        group: prometheus
+        mode: "0755"
+      loop:
+        - /etc/prometheus
+        - /var/lib/prometheus
+
+    - name: prometheus.yml
+      ansible.builtin.copy:
+        src: ../monitoring/prometheus.yml
+        dest: /etc/prometheus/prometheus.yml
+        owner: prometheus
+        mode: "0644"
+      notify: restart prometheus
+
+    - name: systemd unit
+      ansible.builtin.copy:
+        src: ../monitoring/prometheus.service
+        dest: /etc/systemd/system/prometheus.service
+        mode: "0644"
+      notify: restart prometheus
+
+    - name: prometheus running
+      ansible.builtin.systemd:
+        name: prometheus
+        state: started
+        enabled: true
+        daemon_reload: true
+
+    - name: Grafana (EPEL package)
+      ansible.builtin.dnf:
+        name: grafana
+        state: present
+
+    - name: Provision Prometheus datasource
+      ansible.builtin.copy:
+        src: ../monitoring/grafana-datasource.yml
+        dest: /etc/grafana/provisioning/datasources/prometheus.yml
+        owner: root
+        group: grafana
+        mode: "0640"
+      notify: restart grafana
+
+    - name: Provision dashboard provider
+      ansible.builtin.copy:
+        src: ../monitoring/grafana-dashboards.yml
+        dest: /etc/grafana/provisioning/dashboards/hpclab.yml
+        owner: root
+        group: grafana
+        mode: "0640"
+      notify: restart grafana
+
+    - name: Dashboards directory
+      ansible.builtin.file:
+        path: /var/lib/grafana/dashboards
+        state: directory
+        owner: grafana
+        group: grafana
+        mode: "0755"
+
+    - name: Fetch Node Exporter Full dashboard (grafana.com #1860)
+      ansible.builtin.get_url:
+        url: https://grafana.com/api/dashboards/1860/revisions/latest/download
+        dest: /var/lib/grafana/dashboards/node-exporter-full.json
+        owner: grafana
+        mode: "0644"
+
+    - name: Point dashboard at the provisioned datasource
+      ansible.builtin.replace:
+        path: /var/lib/grafana/dashboards/node-exporter-full.json
+        regexp: '\$\{DS_PROMETHEUS\}'
+        replace: "Prometheus"
+      notify: restart grafana
+
+    - name: Anonymous read-only access (NOC/kiosk mode — lab display)
+      ansible.builtin.blockinfile:
+        path: /etc/grafana/grafana.ini
+        marker: "# {mark} hpclab anonymous viewer"
+        block: |
+          [auth.anonymous]
+          enabled = true
+          org_role = Viewer
+      notify: restart grafana
+
+    - name: Grafana running
+      ansible.builtin.systemd:
+        name: grafana-server
+        state: started
+        enabled: true
+
+  handlers:
+    - name: restart prometheus
+      ansible.builtin.systemd:
+        name: prometheus
+        state: restarted
+        daemon_reload: true
+
+    - name: restart grafana
+      ansible.builtin.systemd:
+        name: grafana-server
+        state: restarted
