@@ -20,7 +20,7 @@ Three-node virtualized cluster running on a single physical host (Windows 11, 16
 
 - [x] **1. Linux foundations** — Rocky Linux install on all nodes; static IPs, hostname resolution, SSH key auth, shared users/groups
 - [x] **2. Job scheduling** — SLURM with munge authentication; partitions and QOS; batch, array, and multi-node MPI jobs
-- [ ] **3. Shared storage** — NFS-exported home directories, then BeeGFS parallel file system; notes comparing Lustre/GPFS architectures
+- [x] **3. Shared storage** — NFS-exported home directories with measured contention benchmarks; Lustre/GPFS/BeeGFS architecture notes ([storage write-up](docs/storage-architecture.md)). BeeGFS install deliberately descoped: one storage server can't demonstrate the striping property that justifies a parallel FS — reasoning documented
 - [x] **4. Automation** — Ansible playbooks to provision a compute node from scratch; Bash/Python cluster health-check scripts
 - [x] **5. Monitoring** — Prometheus + node_exporter + Grafana dashboards; deliberate load testing to find and diagnose bottlenecks
 - [x] **6. Containers & hardening** — Apptainer (Singularity) container jobs under SLURM; SSH/firewalld hardening; mapping lab controls to NIST 800-171 families ([mapping](docs/nist-800-171-mapping.md))

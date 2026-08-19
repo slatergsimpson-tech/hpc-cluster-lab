@@ -5,7 +5,21 @@ each problem taught me. Newest entries at the top.
 
 ---
 
-## 2026-08-19 (later) — Milestone 6: Apptainer containers, SSH hardening, NIST mapping
+## 2026-08-19 (afternoon) — Milestone 3 closed: NFS measured, BeeGFS descoped on the merits
+
+Benchmarked our NFS under contention (512 MiB direct-I/O dd): 96 MB/s
+single-client write, 110 read; two concurrent writers degrade to 83+77 —
+the shape of the single-server wall, live on our own hardware. Wrote
+docs/storage-architecture.md: how Lustre/GPFS/BeeGFS split metadata from
+data and stripe across servers to break exactly that wall.
+
+Descoped the BeeGFS install deliberately rather than silently: on this
+host it would be one storage server — the same bottleneck as NFS with more
+daemons. Striping across one server demonstrates nothing a diagram
+doesn't; the honest version of this milestone is measured NFS limits plus
+the architecture knowledge, and a stated bar for what would justify the
+install (≥2 storage nodes with independent disks). Knowing when NOT to
+deploy something is also an infrastructure skill.
 
 `ansible/hardening.yml`: Apptainer on every node plus an sshd drop-in
 (key-only auth, PermitRootLogin no, MaxAuthTries 3) — verified with
