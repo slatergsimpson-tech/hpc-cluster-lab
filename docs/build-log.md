@@ -5,7 +5,31 @@ each problem taught me. Newest entries at the top.
 
 ---
 
-## 2026-08-20 — Lifecycle scripts: clean on/off, clock-safe by construction
+## 2026-08-20 (evening) — The dashboard that never worked: SELinux round three
+
+Demo rehearsal found it: every Grafana panel showed error triangles and
+"No data" — and it turned out the dashboard had NEVER rendered. All my
+earlier verification (Prometheus targets up, API queries returning data)
+was green because it tested the layer BELOW the broken one: Grafana's
+backend was being denied its TCP connection to Prometheus by SELinux
+(AVC: grafana_t denied name_connect to port 9090), so panels 400'd while
+every unconfined curl sailed through.
+
+Diagnosis chain worth remembering: browser triangles → grafana.log
+showing /api/ds/query 400s → replaying a panel query via the API with
+the error body visible ("dial tcp :9090: permission denied") → audit.log
+AVC → getsebool reveals the packagers shipped a boolean for exactly this:
+`grafana_can_tcp_connect_prometheus_port`. One targeted flip, query
+replay returns 200 with all four targets. Codified in monitoring.yml.
+
+Two lessons, both earned twice now: (1) SELinux failures look like
+generic permission errors one layer up — check ausearch/audit.log before
+inventing theories (this was round three after NFS homes and the story
+count keeps growing); (2) "verified" means verified at the layer the
+user experiences. I checked the metrics pipeline and declared the
+monitoring done without ever seeing a rendered panel. The rehearsal
+caught what the deployment checks missed — which is the entire argument
+for rehearsing demos.
 
 The clock-skew bug came back during demo rehearsal (head01 booted 8h in
 the past again; Grafana showed warning triangles because samples were

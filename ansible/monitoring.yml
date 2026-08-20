@@ -181,6 +181,16 @@
         replace: "Prometheus"
       notify: restart grafana
 
+    # EPEL's grafana runs SELinux-confined (grafana_t) and is denied
+    # name_connect to port 9090 by default — panels 400 with "permission
+    # denied" while every unconfined curl works. The packagers ship a
+    # boolean for exactly this integration; flip it, don't disable SELinux.
+    - name: Allow Grafana to connect to Prometheus (SELinux boolean)
+      ansible.posix.seboolean:
+        name: grafana_can_tcp_connect_prometheus_port
+        state: true
+        persistent: true
+
     - name: Anonymous read-only access (NOC/kiosk mode — lab display)
       ansible.builtin.blockinfile:
         path: /etc/grafana/grafana.ini
