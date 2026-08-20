@@ -5,7 +5,27 @@ each problem taught me. Newest entries at the top.
 
 ---
 
-## 2026-08-19 (afternoon) — Milestone 3 closed: NFS measured, BeeGFS descoped on the merits
+## 2026-08-20 — Lifecycle scripts: clean on/off, clock-safe by construction
+
+The clock-skew bug came back during demo rehearsal (head01 booted 8h in
+the past again; Grafana showed warning triangles because samples were
+timestamped in the past relative to the browser's clock — same war story,
+new costume, diagnosed in minutes this time). Root cause of recurrence:
+VMs were dying with the Windows host (power cut, not shutdown), and
+nothing stepped the clock on boot.
+
+Fix is now structural: `scripts/shutdown-cluster.ps1` (graceful, compute
+nodes first, head01 last — clients before servers so nobody hangs on a
+vanished NFS server) and `scripts/startup-cluster.ps1` (head01 first,
+`chronyc makestep` on every node immediately after boot, ends by running
+the full health check). Tested with a complete off/on cycle: ALL GREEN
+from cold, clocks correct without human involvement.
+
+**Interview note:** shutdown order = dependency order reversed; reboots
+are for kernels/firmware/pathological state, not vague slowness (they
+destroy evidence); production does rolling reboots behind scontrol drain.
+And a bug that recurs teaches twice — the second diagnosis took minutes
+because the first one was written down.
 
 Benchmarked our NFS under contention (512 MiB direct-I/O dd): 96 MB/s
 single-client write, 110 read; two concurrent writers degrade to 83+77 —
